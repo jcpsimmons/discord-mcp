@@ -48,8 +48,7 @@ const allToolsets: Record<string, ToolModule> = {
  */
 export function selectModules(): ToolModule[] {
   const raw = process.env.DISCORD_MCP_TOOLSETS?.trim();
-  if (!raw)
-    throw new Error("DISCORD_MCP_TOOLSETS is required and must list explicit toolsets.");
+  if (!raw) throw new Error("DISCORD_MCP_TOOLSETS is required and must list explicit toolsets.");
   const names = [
     ...new Set(
       raw
@@ -59,7 +58,9 @@ export function selectModules(): ToolModule[] {
     ),
   ];
   if (names.includes("all") || names.includes("dm"))
-    throw new Error("Invalid DISCORD_MCP_TOOLSETS: use explicit non-DM toolsets; `all` and `dm` are disabled.");
+    throw new Error(
+      "Invalid DISCORD_MCP_TOOLSETS: use explicit non-DM toolsets; `all` and `dm` are disabled.",
+    );
   const unknown = names.filter((n) => !(n in allToolsets));
   if (unknown.length > 0 || names.length === 0) {
     throw new Error(

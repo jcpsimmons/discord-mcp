@@ -149,5 +149,8 @@ test("guildId enforces DISCORD_ALLOWED_GUILDS lazily", () => {
   } finally {
     delete process.env.DISCORD_ALLOWED_GUILDS;
   }
-  assert.ok(!guildId.safeParse("222222222222222222").success, "unset allow-list must deny all guilds");
+  assert.ok(
+    !guildId.safeParse("222222222222222222").success,
+    "unset allow-list must deny all guilds",
+  );
 });

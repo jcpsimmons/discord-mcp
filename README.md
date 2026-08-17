@@ -2,18 +2,16 @@
 
 # Discord MCP Server
 
-**A lightweight, multi-guild Discord MCP server with 95+ tools**
+**A fail-closed Discord MCP server for local, approved administration**
 
-[![npm](https://img.shields.io/npm/v/@pasympa/discord-mcp)](https://www.npmjs.com/package/@pasympa/discord-mcp)
-[![License](https://img.shields.io/github/license/PaSympa/discord-mcp)](LICENSE)
+[![License](https://img.shields.io/github/license/jcpsimmons/discord-mcp)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D22-green)](https://nodejs.org)
 [![Discord.js](https://img.shields.io/badge/discord.js-v14-5865F2)](https://discord.js.org)
 [![MCP](https://img.shields.io/badge/MCP-compatible-purple)](https://modelcontextprotocol.io)
 
 [![discord-mcp MCP server](https://glama.ai/mcp/servers/PaSympa/discord-mcp/badges/score.svg)](https://glama.ai/mcp/servers/PaSympa/discord-mcp)
 
-Manage your entire Discord server from **Claude Desktop**, **Claude Code**, **Cursor**, **VS Code Copilot**, or any MCP-compatible client.
-Messages, channels, roles, permissions, moderation, forums, webhooks — all through natural language.
+Manage an explicitly allowed Discord server from a local MCP client. Guild access and exposed toolsets must be configured before the process will start.
 
 </div>
 
@@ -21,33 +19,42 @@ Messages, channels, roles, permissions, moderation, forums, webhooks — all thr
 
 ## Why this one?
 
-- **95+ tools** — messages, channels, roles, permissions, moderation, forums, webhooks, scheduled events, invites, DMs, embeds, and more
-- **Multi-guild** — works across multiple servers, no `GUILD_ID` lock-in
-- **Lightweight** — TypeScript + Node.js, ~70kB package, ~73MB Docker image (vs 400MB+ for Java alternatives)
-- **Modular** — clean architecture, easy to extend with new tools
-- **Two install methods** — npm or Docker, your choice
+- **Fail closed** - startup requires both a guild allowlist and an explicit toolset list
+- **No DMs** - direct-message tools are not registered
+- **Local control** - stdio transport only; Discord events cannot invoke the MCP client
+- **Bounded access** - every Discord identifier is checked against the allowed guilds
+- **Approval compatible** - write approval remains controlled by the MCP client
 
 ---
 
 ## Quick Start
 
-Add this to your MCP client config and replace `YOUR_TOKEN_HERE` with your bot token:
+Clone and build this fork:
+
+```bash
+git clone https://github.com/jcpsimmons/discord-mcp
+cd discord-mcp
+npm ci
+npm run build
+```
+
+Then add the built server to your MCP client config:
 
 ```json
 {
   "mcpServers": {
     "discord": {
-      "command": "npx",
-      "args": ["-y", "@pasympa/discord-mcp"],
+      "command": "node",
+      "args": ["/absolute/path/to/discord-mcp/dist/index.js"],
       "env": {
-        "DISCORD_TOKEN": "YOUR_TOKEN_HERE"
+        "DISCORD_TOKEN": "YOUR_TOKEN_HERE",
+        "DISCORD_ALLOWED_GUILDS": "YOUR_GUILD_ID",
+        "DISCORD_MCP_TOOLSETS": "discovery,messages,channels,permissions,members,roles,moderation,screening,stats,forums,webhooks,scheduled_events,invites"
       }
     }
   }
 }
 ```
-
-No install needed — `npx` handles everything.
 
 > Don't have a bot yet? See [Creating Your Discord Bot](#creating-your-discord-bot).
 
@@ -71,7 +78,11 @@ Restart Claude Desktop after saving.
 <summary><strong>Claude Code</strong></summary>
 
 ```bash
-claude mcp add discord -e DISCORD_TOKEN=YOUR_TOKEN_HERE -- npx -y @pasympa/discord-mcp
+claude mcp add discord \
+  -e DISCORD_TOKEN=YOUR_TOKEN_HERE \
+  -e DISCORD_ALLOWED_GUILDS=YOUR_GUILD_ID \
+  -e DISCORD_MCP_TOOLSETS=discovery,messages,channels,permissions,members,roles,moderation \
+  -- node /absolute/path/to/discord-mcp/dist/index.js
 ```
 
 </details>
@@ -100,10 +111,12 @@ Add to your `.vscode/mcp.json`:
   ],
   "servers": {
     "discord": {
-      "command": "npx",
-      "args": ["-y", "@pasympa/discord-mcp"],
+      "command": "node",
+      "args": ["/absolute/path/to/discord-mcp/dist/index.js"],
       "env": {
-        "DISCORD_TOKEN": "${input:discord-token}"
+        "DISCORD_TOKEN": "${input:discord-token}",
+        "DISCORD_ALLOWED_GUILDS": "YOUR_GUILD_ID",
+        "DISCORD_MCP_TOOLSETS": "discovery,messages,channels,permissions,members,roles,moderation"
       }
     }
   }
@@ -115,35 +128,12 @@ See [VS Code MCP docs](https://code.visualstudio.com/docs/copilot/chat/mcp-serve
 </details>
 
 <details>
-<summary><strong>Docker</strong></summary>
-
-```json
-{
-  "mcpServers": {
-    "discord": {
-      "command": "docker",
-      "args": [
-        "run",
-        "--rm",
-        "-i",
-        "-e",
-        "DISCORD_TOKEN=YOUR_TOKEN_HERE",
-        "pasympa/discord-mcp:latest"
-      ]
-    }
-  }
-}
-```
-
-</details>
-
-<details>
 <summary><strong>From source</strong></summary>
 
 ```bash
-git clone https://github.com/PaSympa/discord-mcp
+git clone https://github.com/jcpsimmons/discord-mcp
 cd discord-mcp
-npm install && npm run build
+npm ci && npm run build
 ```
 
 ```json
@@ -153,7 +143,9 @@ npm install && npm run build
       "command": "node",
       "args": ["/absolute/path/to/discord-mcp/dist/index.js"],
       "env": {
-        "DISCORD_TOKEN": "YOUR_TOKEN_HERE"
+        "DISCORD_TOKEN": "YOUR_TOKEN_HERE",
+        "DISCORD_ALLOWED_GUILDS": "YOUR_GUILD_ID",
+        "DISCORD_MCP_TOOLSETS": "discovery,messages,channels,permissions,members,roles,moderation"
       }
     }
   }
@@ -177,19 +169,19 @@ The server loads `.env` automatically via `dotenv`.
 
 ### Environment variables
 
-| Variable                  | Default | Description                                                                                                                                                                                   |
-| ------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DISCORD_TOKEN`           | —       | **Required.** Bot token.                                                                                                                                                                      |
-| `DISCORD_MESSAGE_CONTENT` | `true`  | Set to `false` to stop requesting the Message Content privileged gateway intent at connect time.                                                                                              |
-| `DISCORD_GUILD_MEMBERS`   | `true`  | Set to `false` to stop requesting the Server Members privileged gateway intent at connect time.                                                                                               |
-| `DISCORD_MCP_TOOLSETS`    | `all`   | Comma-separated list of toolsets to expose, to keep the tool list small. Unset or `all` exposes every tool.                                                                                   |
-| `DISCORD_ALLOWED_GUILDS`  | all     | Comma-separated guild IDs the server may act on. When set, tool calls targeting any other guild are rejected — whether addressed by guild ID, channel ID, thread ID, webhook, or invite code. |
+| Variable                  | Default | Description                                                                                                          |
+| ------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------- |
+| `DISCORD_TOKEN`           | —       | **Required.** Bot token.                                                                                             |
+| `DISCORD_MESSAGE_CONTENT` | `false` | Set to `true` only when the Message Content privileged gateway intent is explicitly needed and enabled.              |
+| `DISCORD_GUILD_MEMBERS`   | `false` | Set to `true` only when the Server Members privileged gateway intent is explicitly needed and enabled.               |
+| `DISCORD_MCP_TOOLSETS`    | none    | **Required.** Comma-separated list of toolsets to expose. `all`, `dm`, unknown names, and empty values are rejected. |
+| `DISCORD_ALLOWED_GUILDS`  | none    | **Required.** Comma-separated Discord guild IDs. Calls resolving to any other guild fail closed.                     |
 
 These flags only control which gateway intents the server requests when identifying. Requesting a privileged intent that is **not** enabled in the Developer Portal makes the connection fail at the first tool call (close code `4014`) — set the flag to `false` to connect anyway.
 
 Data access is governed by the **portal toggles**, not by these flags: this server reads everything over the REST API, which Discord gates on the portal setting alone. So with the portal toggles on, setting these flags to `false` loses nothing. With a portal toggle **off**, the corresponding data is restricted regardless of the flags: message bodies come back empty (`content`, `embeds`, `attachments` — except the bot's own messages, DMs, and messages that mention the bot) and member listing fails — enable the toggle in the portal to restore it.
 
-**Toolsets** (`DISCORD_MCP_TOOLSETS`): `discovery`, `messages`, `channels`, `permissions`, `members`, `roles`, `moderation`, `screening`, `stats`, `forums`, `webhooks`, `scheduled_events`, `invites`, `dm`. Example — `DISCORD_MCP_TOOLSETS=discovery,messages,members` exposes only the discovery, message, and member tools. Note: a toolset ships its whole module, including its destructive tools (`messages` includes bulk delete; `members` includes kick/ban) — use `DISCORD_ALLOWED_GUILDS` and the dry-run defaults to bound them. Only the listed toolsets' tools are advertised and callable. Unknown names make the server fail at startup instead of silently exposing everything (an empty value counts as unset and exposes all).
+**Toolsets** (`DISCORD_MCP_TOOLSETS`): `discovery`, `messages`, `channels`, `permissions`, `members`, `roles`, `moderation`, `screening`, `stats`, `forums`, `webhooks`, `scheduled_events`, `invites`. Example: `DISCORD_MCP_TOOLSETS=discovery,messages,members` exposes only those modules. A toolset ships its whole module, including destructive tools, so use the guild allowlist, MCP write approvals, and dry-run defaults together. Unknown names make startup fail instead of silently widening access.
 
 ---
 
@@ -198,7 +190,7 @@ Data access is governed by the **portal toggles**, not by these flags: this serv
 1. Go to [discord.com/developers/applications](https://discord.com/developers/applications)
 2. **New Application** > give it a name
 3. **Bot** tab > **Reset Token** > copy the token
-4. Enable **Privileged Gateway Intents** (this server requests both by default, but new Discord apps have the portal toggles OFF):
+4. Enable privileged Gateway intents only if you also explicitly enable the matching environment variable:
    - Server Members Intent
    - Message Content Intent
 
@@ -211,7 +203,7 @@ Data access is governed by the **portal toggles**, not by these flags: this serv
 
 ---
 
-## Available Tools (97)
+## Available Tools (91)
 
 ### Discovery & Navigation (4 tools)
 
@@ -339,18 +331,6 @@ Data access is governed by the **portal toggles**, not by these flags: this serv
 | `discord_get_event_subscribers`  | Get users who marked "Interested"         |
 | `discord_create_event_invite`    | Create an invite linked to an event       |
 
-### Direct Messages (7 tools)
-
-| Tool                    | Description                                      |
-| ----------------------- | ------------------------------------------------ |
-| `discord_send_dm`       | Send a direct message to a user by their user ID |
-| `discord_send_dm_embed` | Send an embed in a DM to a user                  |
-| `discord_read_dms`      | Read message history from a DM conversation      |
-| `discord_reply_dm`      | Reply to a specific DM message                   |
-| `discord_edit_dm`       | Edit a previously sent DM (text)                 |
-| `discord_edit_dm_embed` | Edit a previously sent DM embed                  |
-| `discord_delete_dm`     | Delete a DM message                              |
-
 ### Invites (5 tools)
 
 | Tool                           | Description                             |
@@ -435,7 +415,7 @@ discord-mcp/
 │       ├── webhooks.ts      ← Webhook management
 │       ├── scheduledEvents.ts ← Scheduled events
 │       ├── invites.ts        ← Invite management
-│       └── dm.ts             ← Direct messages
+│       └── dm.ts             ← Upstream source retained but never registered
 ├── test/                     ← node:test suite (schemas, gating, allow-list)
 ├── scripts/                  ← sync-version.js (npm version hook)
 ├── .github/workflows/        ← CI/CD (build check + auto release)
@@ -463,7 +443,9 @@ discord-mcp/
 - Never commit your Discord token to Git
 - Use environment variables or a `.env` file (not versioned)
 - Give the bot only the permissions it needs
-- Restrict the server to specific servers with `DISCORD_ALLOWED_GUILDS`
+- `DISCORD_ALLOWED_GUILDS` and `DISCORD_MCP_TOOLSETS` are mandatory and fail closed
+- Direct-message tools are not registered
+- Discord events do not start MCP calls or wake the MCP client
 - Irreversible mass actions (`bulk_ban`, `prune_members`, `bulk_delete_messages`, `delete_channel`) default to a `dry_run` preview — pass `dry_run:false` to apply
 
 ---
