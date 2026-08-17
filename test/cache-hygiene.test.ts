@@ -30,6 +30,11 @@ test("Guilds stays requested: the guild/channel/role caches every tool reads dep
   assert.equal(hasIntent(GatewayIntentBits.Guilds), true);
 });
 
+test("privileged gateway intents are disabled unless explicitly enabled", () => {
+  assert.equal(hasIntent(GatewayIntentBits.MessageContent), false);
+  assert.equal(hasIntent(GatewayIntentBits.GuildMembers), false);
+});
+
 test("protected managers keep an unlimited Collection", () => {
   for (const name of PROTECTED_MANAGERS) {
     const cache = discord.options.makeCache(

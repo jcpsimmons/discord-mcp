@@ -23,13 +23,12 @@ const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const LOGIN_TIMEOUT_MS = 30_000;
 
 /**
- * Reads a boolean env flag, defaulting to `true`. Set to false/0/no/off to disable.
- * Used to opt out of the two privileged intents when they are not enabled in the
- * Discord Developer Portal (otherwise the gateway closes with code 4014 on connect).
+ * Reads a boolean env flag, defaulting to `false`. Privileged intents must be
+ * explicitly enabled by the launcher.
  */
 function envEnabled(name: string): boolean {
   const value = process.env[name];
-  return value === undefined || !/^(false|0|no|off)$/i.test(value.trim());
+  return value !== undefined && /^(true|1|yes|on)$/i.test(value.trim());
 }
 
 const messageContentEnabled = envEnabled("DISCORD_MESSAGE_CONTENT");
@@ -149,10 +148,20 @@ export function allowListActive(): boolean {
   return allowedGuilds().length > 0;
 }
 
-/** True if the guild is in DISCORD_ALLOWED_GUILDS, or when no allow-list is configured (empty list allows all guilds). */
-export function isGuildAllowed(guildId: string): boolean {
+/** Fails startup unless every configured guild is an explicit Discord snowflake. */
+export function assertGuildAllowListConfigured(): void {
   const list = allowedGuilds();
-  return list.length === 0 || list.includes(guildId);
+  if (list.length === 0)
+    throw new Error("DISCORD_ALLOWED_GUILDS is required and must contain at least one guild ID.");
+  for (const id of list) {
+    if (!/^\d{17,20}$/.test(id))
+      throw new Error(`DISCORD_ALLOWED_GUILDS contains an invalid guild ID: "${id}".`);
+  }
+}
+
+/** True only when the guild is explicitly listed in DISCORD_ALLOWED_GUILDS. */
+export function isGuildAllowed(guildId: string): boolean {
+  return allowedGuilds().includes(guildId);
 }
 
 /**
@@ -160,7 +169,10 @@ export function isGuildAllowed(guildId: string): boolean {
  * (channel/thread/webhook IDs resolve to a guild only after fetching).
  */
 export function assertAllowedGuild(guildId: string | null | undefined): void {
-  if (guildId && !isGuildAllowed(guildId))
+  if (!guildId) return;
+  if (!allowListActive())
+    throw new Error("DISCORD_ALLOWED_GUILDS is required and must contain at least one guild ID.");
+  if (!isGuildAllowed(guildId))
     throw new Error(`Guild ${guildId} is not in the DISCORD_ALLOWED_GUILDS allow-list.`);
 }
 

@@ -6,7 +6,7 @@ import {
   McpError,
 } from "@modelcontextprotocol/sdk/types.js";
 
-import { ensureConnected } from "./client.js";
+import { assertGuildAllowListConfigured, ensureConnected } from "./client.js";
 import { formatToolError } from "./errors.js";
 import { getAllDefinitions, handleTool, hasTool } from "./tools/index.js";
 
@@ -15,6 +15,7 @@ import { getAllDefinitions, handleTool, hasTool } from "./tools/index.js";
  * transport to the caller: stdio in production, in-memory in tests.
  */
 export function createServer(version: string): Server {
+  assertGuildAllowListConfigured();
   const server = new Server({ name: "discord-mcp", version }, { capabilities: { tools: {} } });
 
   server.setRequestHandler(ListToolsRequestSchema, async (req) => {

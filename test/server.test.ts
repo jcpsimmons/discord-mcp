@@ -25,10 +25,23 @@ test("unknown tool is a JSON-RPC InvalidParams protocol error, not a tool result
   await client.close();
 });
 
+test("createServer refuses missing or malformed guild allow-lists", () => {
+  const original = process.env.DISCORD_ALLOWED_GUILDS;
+  try {
+    for (const value of [undefined, "", "not-a-snowflake", "111111111111111111,broken"]) {
+      if (value === undefined) delete process.env.DISCORD_ALLOWED_GUILDS;
+      else process.env.DISCORD_ALLOWED_GUILDS = value;
+      assert.throws(() => createServer("0.0.0-test"), /DISCORD_ALLOWED_GUILDS/);
+    }
+  } finally {
+    process.env.DISCORD_ALLOWED_GUILDS = original;
+  }
+});
+
 test("tools/list serves every definition and rejects unexpected cursors", async () => {
   const client = await connectedClient();
   const { tools } = await client.listTools();
-  assert.equal(tools.length, 98, "update this pin when adding/removing tools");
+  assert.equal(tools.length, 91, "update this pin when adding/removing tools");
   await assert.rejects(
     () => client.listTools({ cursor: "bogus" }),
     (err: unknown) => err instanceof McpError && err.code === ErrorCode.InvalidParams,

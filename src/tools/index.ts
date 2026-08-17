@@ -23,7 +23,6 @@ import forums from "./forums.js";
 import webhooks from "./webhooks.js";
 import scheduledEvents from "./scheduledEvents.js";
 import invites from "./invites.js";
-import dm from "./dm.js";
 
 /** Every toolset, keyed by the name used in the `DISCORD_MCP_TOOLSETS` env var. */
 const allToolsets: Record<string, ToolModule> = {
@@ -40,17 +39,17 @@ const allToolsets: Record<string, ToolModule> = {
   webhooks,
   scheduled_events: scheduledEvents,
   invites,
-  dm,
 };
 
 /**
  * Selects which toolsets to expose from `DISCORD_MCP_TOOLSETS` (comma-separated,
- * case-insensitive). Unset, empty, or `all` exposes everything; unknown names throw
- * at startup: a typo must not silently expose the full destructive surface.
+ * case-insensitive). The selection is mandatory, `all` is rejected, and DM tools
+ * are not registered in this hardened fork.
  */
 export function selectModules(): ToolModule[] {
   const raw = process.env.DISCORD_MCP_TOOLSETS?.trim();
-  if (!raw) return Object.values(allToolsets);
+  if (!raw)
+    throw new Error("DISCORD_MCP_TOOLSETS is required and must list explicit toolsets.");
   const names = [
     ...new Set(
       raw
@@ -59,7 +58,8 @@ export function selectModules(): ToolModule[] {
         .filter(Boolean),
     ),
   ];
-  if (names.includes("all")) return Object.values(allToolsets);
+  if (names.includes("all") || names.includes("dm"))
+    throw new Error("Invalid DISCORD_MCP_TOOLSETS: use explicit non-DM toolsets; `all` and `dm` are disabled.");
   const unknown = names.filter((n) => !(n in allToolsets));
   if (unknown.length > 0 || names.length === 0) {
     throw new Error(

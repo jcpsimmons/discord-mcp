@@ -3,11 +3,15 @@ import assert from "node:assert/strict";
 import { selectModules, hasTool } from "../src/tools/index.js";
 import { assertAllowedGuild, isGuildAllowed } from "../src/client.js";
 
-test("selectModules exposes everything when unset or `all`", () => {
-  delete process.env.DISCORD_MCP_TOOLSETS;
-  const all = selectModules().length;
-  process.env.DISCORD_MCP_TOOLSETS = "all";
-  assert.equal(selectModules().length, all);
+const SAFE_TOOLSETS =
+  "discovery,messages,channels,permissions,members,roles,moderation,screening,stats,forums,webhooks,scheduled_events,invites";
+
+test("selectModules fails closed unless explicit non-DM toolsets are configured", () => {
+  for (const value of [undefined, "", "all", "discovery,dm"]) {
+    if (value === undefined) delete process.env.DISCORD_MCP_TOOLSETS;
+    else process.env.DISCORD_MCP_TOOLSETS = value;
+    assert.throws(() => selectModules(), /DISCORD_MCP_TOOLSETS/);
+  }
   delete process.env.DISCORD_MCP_TOOLSETS;
 });
 
@@ -56,21 +60,26 @@ function assertStrictObjectSchemas(node: unknown, tool: string, path: string): v
 }
 
 test("every tool's inputSchema forbids unknown keys at every nesting level", () => {
-  delete process.env.DISCORD_MCP_TOOLSETS;
-  for (const mod of selectModules()) {
-    for (const def of mod.definitions) {
-      assert.equal(
-        (def.inputSchema as Record<string, unknown>).additionalProperties,
-        false,
-        `${def.name} root must advertise additionalProperties: false`,
-      );
-      assertStrictObjectSchemas(def.inputSchema, def.name, "inputSchema");
+  process.env.DISCORD_MCP_TOOLSETS = SAFE_TOOLSETS;
+  try {
+    for (const mod of selectModules()) {
+      for (const def of mod.definitions) {
+        assert.equal(
+          (def.inputSchema as Record<string, unknown>).additionalProperties,
+          false,
+          `${def.name} root must advertise additionalProperties: false`,
+        );
+        assertStrictObjectSchemas(def.inputSchema, def.name, "inputSchema");
+      }
     }
+  } finally {
+    delete process.env.DISCORD_MCP_TOOLSETS;
   }
 });
 
 test("hasTool reflects the registry", () => {
   assert.ok(hasTool("discord_list_guilds"));
+  assert.ok(!hasTool("discord_send_dm"), "DM tools must never be registered");
   assert.ok(!hasTool("discord_nonexistent"));
 });
 
@@ -84,5 +93,6 @@ test("assertAllowedGuild enforces the allow-list lazily and ignores null", () =>
   } finally {
     delete process.env.DISCORD_ALLOWED_GUILDS;
   }
-  assertAllowedGuild("222222222222222222");
+  assert.equal(isGuildAllowed("222222222222222222"), false);
+  assert.throws(() => assertAllowedGuild("222222222222222222"), /DISCORD_ALLOWED_GUILDS/);
 });
